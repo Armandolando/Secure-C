@@ -893,8 +893,18 @@ int main(){
     
 }
 ```
+The following example give to the program as input four As end ten (number estimated watching the stack in gdb) specifiers in order to see the contents on the stack
 
-![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/with_A.png)
+![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/with_A.png)
 
+We see that owr four As are on the stack (41414141 ASCII code for AAAA) and we print them. 
+
+![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/with_A2.png)
+
+Now with gdb we verify that the address of the location where the As are stored is the second addres prited so we sobtitute that specifier with an %n in order to modify that location with a number of padding equals to the hexadecimal numeber of "LOL" in order to overwrite the As with "LOL" 
+
+![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/with_LOL.png)
+
+![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/with_LOL2.png)
 
 
