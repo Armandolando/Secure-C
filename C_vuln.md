@@ -901,10 +901,236 @@ We see that owr four As are on the stack (41414141 ASCII code for AAAA) and we p
 
 ![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/with_A2.png)
 
-Now with gdb we verify that the address of the location where the As are stored is the second addres prited so we sobtitute that specifier with an %n in order to modify that location with a number of padding equals to the hexadecimal numeber of "LOL" in order to overwrite the As with "LOL" 
+Now with gdb we verify that the address of the location where the As are stored is the second addres prited so we sobtitute that specifier with an %n in order to modify that location with a number of padding equals to the hexadecimal number of "LOL" (4c4f4c) in order to overwrite the As with "LOL" 
 
 ![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/with_LOL.png)
 
 ![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/with_LOL2.png)
+
+#### Alternative in Rust
+
+The first argument of println! is a format string. It is required by the compiler for this to be a string literal; it cannot be a variable passed in (in order to perform validity checking). The compiler will then parse the format string and determine if the list of arguments provided is suitable to pass to this format string.
+
+```rust
+use std::io;
+use std::io::prelude::*;
+use std::io::Write;
+use std::str;
+
+fn main() {
+    let mut vector = Vec::new();
+    let stdin = io::stdin();
+    for line in stdin.lock().lines(){
+        write!(&mut vector, "{}", &line.unwrap());
+        println!("{}",str::from_utf8(&vector).unwrap());
+    }
+}
+```
+## Race Condition
+
+####Vulnerable C++ code
+
+Without the lock variable the threads can access the shered data at the same time
+
+```c++
+#include <unistd.h>
+#include <thread>
+#include <iostream>
+using namespace std;
+int shared_data = 0;
+void thread_function(int id) {
+    shared_data = id; // start of race window on shared_data
+    cout << "Thread " << id << " set shared value to "
+         << shared_data << endl;
+    usleep(id * 100);
+    cout << "Thread " << id << " has shared value as "
+         << shared_data << endl;
+// end of race window on shared_data
+}
+
+int main(void) {
+    const size_t thread_size = 10;
+    thread threads[thread_size];
+    for (size_t i = 0; i < thread_size; i++)
+      threads[i] = thread(thread_function, i);
+    for (size_t i = 0; i < thread_size; i++)
+      threads[i].join();
+
+// Wait until threads are complete before main() continues
+    cout << "Done" << endl;
+    return 0;
+}
+```
+#### Fixed C++ code
+
+Introducing a lock variabile the race contidion is secure
+
+```c++
+#include <unistd.h>
+#include <thread>
+#include <iostream>
+#include <mutex>
+
+using namespace std;
+
+int shared_data = 0;
+mutex shared_lock;
+
+void thread_function(int id) {
+    shared_lock.lock();
+    shared_data = id;
+    cout << "Thread " << id << " set shared value to "
+         << shared_data << endl;
+    usleep(id * 100);
+    cout << "Thread " << id << " has shared value as "
+         << shared_data << endl;
+    shared_lock.unlock();
+}
+
+int main(void) {
+    const size_t thread_size = 10;
+    thread threads[thread_size];
+    for (size_t i = 0; i < thread_size; i++)
+      threads[i] = thread(thread_function, i);
+    for (size_t i = 0; i < thread_size; i++)
+      threads[i].join();
+
+// Wait until threads are complete before main() continues
+    cout << "Done" << endl;
+    return 0;
+}
+```
+
+#### Alternative in Rust
+
+```rust
+use std::sync::{Mutex, Arc};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+
+## Polymorphism
+
+### Dynamic Polymorphism
+
+#### Vulnerable C++ code
+
+C extends B that extends A. Both have a function called print that could cause ambiguity when we call it from a C object
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A {
+    public:
+        void print()
+         {cout<<"A class content\n";}
+    public:
+        void printA(){
+          cout<<"A class content\n";
+        }
+};
+
+class B : public A {
+    public:
+        void print()
+         {cout<<"B class content\n";}
+};
+
+class C : public B{};
+
+int main(){
+    C c;
+    c.print();
+    c.printA();
+    return 0;
+}
+```
+
+#### Alternative in Rust
+
+Rust is not Object Oriented but it is possible to simulate polymorphism with traits
+
+lib.rs:
+```rust
+pub struct Square{
+    
+    pub a : u32,
+    pub b : u32,
+}
+
+pub struct Triangle{
+    
+    pub a : u32,
+    pub b : u32,
+}
+
+pub trait Geometry{
+    fn area(&self)->u32;
+}
+
+impl Geometry for Square{
+    fn area(&self)->u32{
+        self.a * self.b
+    }
+}
+
+impl Geometry for Triangle{
+    fn area(&self)->u32{
+        (self.a * self.b)/2
+    }
+}
+```
+
+main.rs:
+```rust
+extern crate rust_quite_polymorphism;
+
+use rust_quite_polymorphism::*;
+use std::string::String;
+
+fn area_as_string<T:Geometry>(shape:T)->String{
+    
+    format!("The area of the shape is {}", shape.area())
+}
+
+fn main() {
+    let sqr = Square{
+        a : 2,
+        b : 3,
+    };
+    
+    let tri = Triangle{
+        a:5,
+        b:4,
+    };
+    
+    println!("{}", area_as_string(sqr));
+    println!("{}", area_as_string(tri));
+}
+```
+
+
 
 
