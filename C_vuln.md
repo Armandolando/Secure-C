@@ -461,4 +461,130 @@ fn main() {
     println!("{}", result);
 }
 ```
+## Integer Vulnerabilities
+
+### Integer Truncation and Integer Overflow
+
+#### Vulnerable C code
+
+The association of a value to a variabile with a smaller precision or to an unsigned variable can cause truncation or overflow
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main(){
+    int i = -1111111111;
+    
+    printf("%i\n", i);
+    
+    short x;
+    
+    x = i;
+    
+    printf("%d\n", (short)(x));
+    
+    unsigned char c1=256;
+    unsigned char c2=-6;
+    printf("%d,  %d\n",c1+1,c2);
+    
+    int buffer[1000000];
+    short size_int = sizeof(buffer);
+    size_t size_size_t = (size_t)(sizeof(buffer));
+    
+    printf("%d, %ld, %d\n", size_int, size_size_t, sizeof(buffer));
+    
+    return 0;
+}
+```
+#### Alternative in Rust
+
+This code doesn't compile
+
+```rust
+fn main() {
+    let x:i16 = -1;
+    
+    let y:i8 = x;
+    println!("{}", y);
+}
+```
+Rust gives you methods to verify if a integer overflow occurs
+
+```rust
+fn main() {
+    match 255u8.checked_add(1){
+        Some(x) => println!("{}", x),
+        None => println!("Overflow!"),
+    };
+    
+    let (x, flag) = 255u8.overflowing_add(4);
+    
+    if flag{
+       println!("Overflow! {}", x); 
+    } 
+}
+```
+### Negative Indexing
+
+#### Vulnerable C code
+
+C allows negative indexing for an array accessing to memory over the bounds of the array
+
+```c
+#include <stdio.h>
+
+int main(){
+    int buf[3];
+    
+    for(int i=0; i<sizeof(buf); i++){
+        buf[i] =  i+1;
+    }
+    
+    for(int i=-3; i<5; i++){
+        printf("%i, %i\n", i, buf[i]);
+    }
+    
+    return 0;
+}
+```
+
+#### Fixed C code
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#define NELEMS(x)  (sizeof(x) / sizeof((x)[0]))
+
+int main(){
+    int buf[3];
+    
+    for(int i=0; i<NELEMS(buf); i++){
+        buf[i] =  i+1;
+    }
+    
+    for(int i=-3; i<5; i++){
+        if(i>=0 && i<NELEMS(buf)){
+            printf("%i, %i\n", i, buf[i]);
+        }
+    }
+    
+    return 0;
+}
+```
+
+#### Alternative in Rust
+
+Rust doesn't allow negative indexing and promote the use of itarators istead
+
+```rust
+fn main() {
+    let buf = vec![1, 2, 3];
+    
+    let buf1 : Vec<i32> = buf.iter().map(|x| x+1).collect();
+    
+    println!("{:?}", buf1);
+}
+```
 
