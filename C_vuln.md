@@ -576,7 +576,7 @@ int main(){
 
 #### Alternative in Rust
 
-Rust doesn't allow negative indexing and promote the use of itarators istead
+Rust doesn't allow negative indexing and promote the use of itarators instead 
 
 ```rust
 fn main() {
@@ -587,4 +587,314 @@ fn main() {
     println!("{:?}", buf1);
 }
 ```
+## Heap Managment
+
+### Null Pointer
+
+#### Vulnerable C code 
+
+The use of malloc can create a null pointer that in the embedded systems could be overwritten and point to a malicious function 
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(){
+    char buf[10];
+    
+    for(int i = 0; i<sizeof(buf); i++){
+        buf[i] =(char *) malloc(sizeof(buf));
+        if(!buf[i]){
+            printf("NUll_pointer index: %i\n", i);
+            break;
+        }
+    }
+    
+    return 0;
+}
+```
+#### Fixed C code
+
+Verify if a null pointer occure and retry the malloc, if fail agian exits the program 
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(){
+    char buf[10];
+    
+    for(int i = 0; i<sizeof(buf); i++){
+        buf[i] =(char *) malloc(sizeof(buf));
+        if(!buf[i]){
+            printf("NUll_pointer index: %i\n", i);
+            buf[i] =(char *) malloc(sizeof(buf));
+            if(!buf[i]){
+            printf("NUll_pointer index: %i\nNot enough space: exit", i);
+            exit(1);
+            }
+            
+        }
+    }
+    
+    return 0;
+}
+```
+#### Alternative in Rust
+
+Rust allow the use of raw pointers in safe Rust but they can only dereferenced in unsafe blocks. The raw pointers aren't recomanded because they don't follow the rules of references and allow a immutable and immutable pointer at the same time. Is safe to use only refernces
+
+##### The Rules of References
+
+    * At any given time, you can have either one mutable reference or any number of immutable references.
+    * References must always be valid.
+    
+### Use after free() vulnerability
+
+#### Vulnerable C code
+
+C allows to use pointers after the call of free() funtion on them
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(){
+    int *a = malloc(sizeof(int));
+    *a = 8;
+    printf("%i\n", *a);
+    free(a);
+    *a = 9;
+    printf("%i\n", *a);
+    return 0;
+}
+
+```
+#### Altrnative in Rust
+
+Rust drops a varible every time goes out of scope but it also possible to call the drop function before. After drop the variable can't be used anymore if we try to use it the program panics at 
+compile time.
+
+```rust
+
+use std::string::String;
+
+fn still_alive(string: &String){
+    println!("{:?}", string);
+}
+
+fn main() {
+    let x = String::from("Still alive");
+    still_alive(&x);
+    drop(x);
+    println!("{}", x);
+}
+```
+To avoid dangling references, in to compile the program, we have to specify the "lifetime" of a variable. The following code will not compile because string2 doesn't live long enough.
+
+```rust
+use std::string::String;
+
+fn longest<'a>(x:&'a str, y:&'a str)->&'a str{
+    if x.len() > y.len(){
+        x
+    } else {
+        y
+    }
+}
+
+fn main() {
+    let string1 = String::from("aaaaaaaaaaaaaaa");
+    let result;
+    {
+        let string2 = String::from("bbbbbbbbb");
+        result = longest(string1.as_str(),string2.as_str());
+    }
+    println!("The longest string is {}", result);
+}
+``` 
+In order to compile string1 and string2 must have the same lifetime
+
+```rust
+use std::string::String;
+
+fn longest<'a>(x:&'a str, y:&'a str)->&'a str{
+    if x.len() > y.len(){
+        x
+    } else {
+        y
+    }
+}
+
+fn main() {
+    let string1 = String::from("aaaaaaaaaaaaaaa");
+    let string2 = String::from("bbbbbbbbb");
+    let result;
+    
+    
+    result = longest(string1.as_str(),string2.as_str());
+    
+    println!("The longest string is {}", result);
+}
+
+```
+
+### Unlink exploit
+
+#### Vulnerable C code
+
+In this example two small chunks are allocated next to each other. Now we create a fake chunk in the chunk1's data and we modify fd and bk pointers .By overflowing the first chunk we overwrite the flag of the second chunck that indicate if the previous chunk is free. Doing that, after we call free on the second chunck, the unlink macro is triggered and it verifies if the previous chunk is free by reading the overwitten flag of the second chunk and detects the fake chunk indeed.The fake chunk is unlinked in order to merge the consecutive chunks.The unlink execute the following instrutions:
+
+    * P->fd->bk = P->bk 
+    * P->bk->fd = P->fd
+    
+In this case both P->fd->bk and P->bk->fd point to the same location. Now chunk1[3] and chunk[0] point to the same data
+
+
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+struct chunk_structure{
+    size_t prev_size;
+    size_t size;
+    struct chunk_structure *fd;
+    struct chunk_structure *bk;
+    char buf[10];
+};
+
+int main(){
+    unsigned long long *chunk1, *chunk2;
+    struct chunk_structure *fake_chunk, *chunk2_hdr;
+    char data[20];
+    
+    chunk1=malloc(0X80);
+    chunk2=malloc(0x80);
+    printf("%p\n", &chunk1);
+    printf("%p\n", chunk1);
+    printf("%p\n", chunk2);
+
+    
+    fake_chunk = (struct chunk_structure *)chunk1;
+    fake_chunk->fd = (struct chunk_structure *)(&chunk1 - 3); 
+    fake_chunk->bk = (struct chunk_structure *)(&chunk1 - 2);
+    
+    chunk2_hdr = (struct chunk_structure *)(chunk2 - 2);
+    chunk2_hdr->prev_size=0x80;
+    chunk2_hdr->size &=~0x1;
+    
+    free(chunk2);
+    
+    chunk1[3] = (unsigned long long)data;
+    
+    strcpy(data, "Victim's data");
+    
+    chunk1[0] = 0x002164656b636168LL;
+    
+    printf("%s\n", data);
+       
+    return 0;
+}
+```
+
+#### Altrenative in Rust
+
+As said before raw pointers can be dereferencied only in usafe Rust so modify the pointers is not possible in safe code.
+
+### Double free() Vulnerability
+
+#### Vulnerable C code
+
+This program shows how double freeing "a" the pointers "d" and "f" will point to the same location 
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(){
+    char *a = malloc(10*sizeof(char));
+    char *b = malloc(10*sizeof(char));
+    char *c = malloc(10*sizeof(char));
+    
+    free(a);
+    free(b);
+    free(a);
+    
+    char *d = malloc(10*sizeof(char));
+    char *e = malloc(10*sizeof(char));
+    char *f = malloc(10*sizeof(char));
+    
+    char *text = "This is d";
+    
+    snprintf(d, 10, text);
+    
+    printf("%s\n", f);
+    
+    return 0;
+}
+```
+
+#### Alternative in Rust
+
+Rust after the first drop, as the free() vulnerability example, will not allow to use the dropped varible for the ownership rules.
+
+## Format Strings Vulnerabilities
+
+#### Vulnerable C code
+
+Here if we give to the program some string specifiers as arguments it will print the contents on the stack
+
+```c
+#include<stdio.h>
+#include<string.h>
+
+int main(int argc, char** argv) {
+    char buffer[100];
+    strncpy(buffer, argv[1], 100);
+    printf(buffer);
+    return 0;
+}
+```
+In this other example we can overwrite the memory
+
+```c
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+void printstr(char *string){
+    for(int i = 3; i>=0; i--){
+        printf("%c", string[i]);
+    }
+    
+    printf("\n");
+}
+
+void printbuffer(char *string){
+    printf(string);
+}
+
+void vuln(){
+    char buff[512];
+    
+    fgets(buff, sizeof(buff), stdin);
+    
+    printbuffer(buff);
+    printstr(buff);
+    
+}
+
+int main(){
+    vuln();
+    
+}
+```
+
+![with_A](/home/marco/Pictures/with.png)
+
+
 
