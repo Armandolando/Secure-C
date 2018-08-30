@@ -894,7 +894,7 @@ int main(){
 }
 ```
 
-![with_A](/home/marco/Pictures/with.png)
+![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/with_A.png)
 
 
 
