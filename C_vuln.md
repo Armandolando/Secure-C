@@ -1350,7 +1350,7 @@ int main(){
 }
 ```
 
-#### ALternative in Rust
+#### Alternative in Rust
 
 Rust is not an Object Oriented language and allows casting to primitive types
 
