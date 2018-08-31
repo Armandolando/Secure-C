@@ -901,7 +901,7 @@ We see that owr four As are on the stack (41414141 ASCII code for AAAA) and we p
 
 ![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/with_A2.png)
 
-Now with gdb we verify that the address of the location where the As are stored is the second addres prited so we sobtitute that specifier with an %n in order to modify that location with a number of padding equals to the hexadecimal number of "FOO" (464f4f) in order to overwrite the As with "LOL" 
+Now with gdb we verify that the address of the location where the As are stored is the second addres prited so we sobtitute that specifier with an %n in order to modify that location with a number of padding equals to the hexadecimal number of "FOO" (464f4f) in order to overwrite the As with "FOO" 
 
 ![with_A](https://github.com/MarcoArazzi/Secure-C/blob/master/images/foo.png)
 
