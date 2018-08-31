@@ -642,7 +642,11 @@ int main(){
 ```
 #### Alternative in Rust
 
-Rust allow the use of raw pointers in safe Rust but they can only dereferenced in unsafe blocks. The raw pointers aren't recomanded because they don't follow the rules of references and allow a immutable and immutable pointer at the same time. Is safe to use only refernces
+Rust allow the use of raw pointers in safe Rust but they can only dereferenced in unsafe blocks. The raw pointers aren't recomanded because they don't follow the rules of references and allow a immutable and immutable pointer at the same time. Is safe to use only refernces. Also in Rust the NULL doesn't exists because  can be dangerous. In his 2009 presentation “Null References: The Billion Dollar Mistake,” Tony Hoare, the inventor of null, has this to say:
+
+```blockquote
+I call it my billion-dollar mistake. At that time, I was designing the first comprehensive type system for references in an object-oriented language. My goal was to ensure that all use of references should be absolutely safe, with checking performed automatically by the compiler. But I couldn’t resist the temptation to put in a null reference, simply because it was so easy to implement. This has led to innumerable errors, vulnerabilities, and system crashes, which have probably caused a billion dollars of pain and damage in the last forty years.
+```text 
 
 ##### The Rules of References
 
@@ -1130,7 +1134,219 @@ fn main() {
     println!("{}", area_as_string(tri));
 }
 ```
+### Casting
 
+#### Vulnerable C++ code
 
+Unsafe use of static/dynamic casting. Cast an A object to a B object and call a method that in A doesn't exist
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A {
+        
+    public:
+        void printA(){
+          cout<<"A class content\n";
+        }
+};
+
+class B : public A {
+    public:
+       virtual void print()
+         {cout<<"B class content\n";};
+};
+
+class C : public B{};
+
+int main(){
+    A a;
+    a.printA();
+    static_cast<B *>(&a)->print();
+    return 0;
+}
+```
+
+Reinterpret cast reinterpret the bit stream of two objects and the function pointer to void
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class Widget { 
+    public: 
+      Widget() { } 
+      ~Widget() { } 
+      virtual void foo() { } 
+}; 
+
+class Other { 
+    public: 
+      Other() { i = 0x41414141; } 
+      ~Other() { } 
+      int i; 
+}; 
+
+int example(){
+    cout<<"Example\n";
+    return 1;
+}
+
+int main() { 
+    Other *o = new Other(); 
+    Widget *b = reinterpret_cast<Widget *>(o); 
+    b->foo(); 
+    delete o; 
+    void(*fp1)() = reinterpret_cast<void(*)()>(example);
+    fp1();
+    return 0;
+}
+```
+
+Cast ot void is unsafe becouse it avoid safety checks
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A {
+        
+    public:
+        void printA(){
+          cout<<"A class content\n";
+        }
+};
+
+class B : public A {
+    public:
+       virtual void print()
+         {cout<<"B class content\n";};
+};
+
+class C : public B{};
+
+int main(){
+    A a;
+    a.printA();
+    void* vB = static_cast<void *>(&a);
+    B* b = static_cast<B *>(vB);
+    b->print();
+    return 0;
+}
+```
+
+#### Fixed C++ code
+
+In order to be sure we are doing casting right we verify that the object is the same type of the class we are casting to
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A {
+        
+    public:
+        void printA(){
+          cout<<"A class content\n";
+        }
+};
+
+class B : public A {
+    public:
+       virtual void print()
+         {cout<<"B class content\n";};
+};
+
+class C : public B{};
+
+int main(){
+    A a;
+    a.printA();
+    B* b = static_cast<B *>(&a);
+    if(typeid(a)==typeid(B*)){
+        b->print();
+    }
+    return 0;
+}
+```
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class Widget { 
+    public: 
+      Widget() { } 
+      ~Widget() { } 
+      virtual void foo() { } 
+}; 
+
+class Other { 
+    public: 
+      Other() { i = 0x41414141; } 
+      ~Other() { } 
+      int i; 
+}; 
+
+int example(){
+    cout<<"Example\n";
+    return 1;
+}
+
+int main() { 
+    Other *o = new Other(); 
+    Widget *b = reinterpret_cast<Widget *>(o); 
+    if(typeid(o)==typeid(Widget*)){
+        b->foo(); 
+    } 
+    delete o; 
+    int(*fp1)() = reinterpret_cast<int(*)()>(example);
+    fp1();
+    return 0;
+}
+```
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class A {
+        
+    public:
+        void printA(){
+          cout<<"A class content\n";
+        }
+};
+
+class B : public A {
+    public:
+       virtual void print()
+         {cout<<"B class content\n";};
+};
+
+class C : public B{};
+
+int main(){
+    A a;
+    a.printA();
+    void* vB = static_cast<void *>(&a);
+    B* b = static_cast<B *>(vB);
+    if(typeid(a)==typeid(B *)){
+        b->print();
+    }
+    return 0;
+}
+```
+
+#### ALternative in Rust
+
+Rust is not an Object Oriented language and allows casting to primitive types
 
 
