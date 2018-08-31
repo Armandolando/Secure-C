@@ -937,7 +937,7 @@ fn main() {
 ```
 ## Race Condition
 
-####Vulnerable C++ code
+#### Vulnerable C++ code
 
 Without the lock variable the threads can access the shered data at the same time
 
