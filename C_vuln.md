@@ -653,7 +653,7 @@ implement. This has led to innumerable errors, vulnerabilities, and system crash
 probably caused a billion dollars of pain and damage in the last forty years.
 ``` 
 
-##### The Rules of References
+* The Rules of References
 
     * At any given time, you can have either one mutable reference or any number of immutable references.
     * References must always be valid.
